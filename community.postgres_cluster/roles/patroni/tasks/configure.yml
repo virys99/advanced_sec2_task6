@@ -1,0 +1,90 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for patroni
+
+- name: Configure patroni master
+  when: is_master is defined and is_master == 'true'
+  block:
+    - name: Grant user replication from network {{ cluster_communication_network }}
+      community.postgresql.postgresql_pg_hba:
+        dest: "{{ postgres_config_dir }}/pg_hba.conf"
+        contype: host
+        users: "{{ patroni_repl_user }}"
+        source: "{{ cluster_communication_network }}"
+        databases: replication
+        method: scram-sha-256
+    - name: Grant user postgres from network {{ cluster_communication_network }}
+      community.postgresql.postgresql_pg_hba:
+        dest: "{{ postgres_config_dir }}/pg_hba.conf"
+        contype: host
+        users: "{{ patroni_superuser }}"
+        source: "{{ cluster_communication_network }}"
+        databases: all
+        method: scram-sha-256
+    - name: Start postgresql
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+        enabled: false
+    - name: Create user for replication
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: "{{ patroni_repl_user }}"
+        password: "{{ patroni_repl_pass }}"
+        role_attr_flags: REPLICATION
+      environment:
+        PGOPTIONS: "-c password_encryption=scram-sha-256"
+      no_log: true
+    - name: Password for superuser postgres
+      become: true
+      become_user: postgres
+      community.postgresql.postgresql_user:
+        name: "{{ patroni_superuser }}"
+        password: "{{ patroni_superuser_pass }}"
+      environment:
+        PGOPTIONS: "-c password_encryption=scram-sha-256"
+      no_log: true
+    - name: Stop postgresql
+      ansible.builtin.service:
+        name: postgresql
+        state: stopped
+        enabled: false
+    - name: Start Patroni master service
+      ansible.builtin.service:
+        daemon_reload: true
+        name: "patroni"
+        state: started
+        enabled: true
+    - name: Verify primary liveness
+      ansible.builtin.uri:
+        url: "http://localhost:8008/liveness"
+        # user: "{{ _api_username }}"
+        # password: "{{ _api_password }}"
+        method: GET
+        status_code: 200
+        timeout: 3
+      register: _patroni_liveness_query
+      retries: 30
+      delay: 15
+      until: _patroni_liveness_query is succeeded
+    - name: Verify primary status
+      ansible.builtin.uri:
+        url: "http://localhost:8008/primary"
+        # user: "{{ _api_username }}"
+        # password: "{{ _api_password }}"
+        method: GET
+        status_code: 200
+        timeout: 3
+      register: _patroni_status_query
+      retries: 30
+      delay: 15
+      until: _patroni_status_query is succeeded
+
+- name: Removing cluster directory
+  ansible.builtin.file:
+    path: "{{ postgres_data_dir }}"
+    state: absent
+  notify:
+    - Restart patroni
+  when: is_master is defined and is_master == 'false'

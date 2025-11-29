@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for patroni
+
+- name: Install acl for become
+  ansible.builtin.package:
+    name: acl
+    state: present
+
+- name: Copy systemd service file "/etc/systemd/system/patroni.service"
+  ansible.builtin.template:
+    src: templates/patroni.service.j2
+    dest: /etc/systemd/system/patroni.service
+    owner: postgres
+    group: postgres
+    mode: '644'
+
+- name: Create a directory for patroni config
+  ansible.builtin.file:
+    path: /etc/patroni
+    owner: postgres
+    group: postgres
+    state: directory
+    mode: '744'
+
+- name: Create archived directory for postgres 
+  ansible.builtin.file:
+    path: "{{ archived_dir }}"
+    owner: postgres
+    group: postgres
+    recurse: true
+    state: directory
+    mode: '744'
+
+- name: Create a patroni config
+  ansible.builtin.template:
+    src: patroni.yaml.j2
+    dest: /etc/patroni/config.yml
+    owner: postgres
+    group: postgres
+    mode: '644'
+  notify:
+    - Restart patroni
+
+- name: Stop postgresql and disable
+  ansible.builtin.service:
+    name: postgresql
+    state: stopped
+    enabled: false
+
+- name: "Install patroni for specific distro"
+  when: ansible_facts['os_family'] not in ['Darwin']
+  ansible.builtin.include_tasks: "{{ _install_tasks_file }}"
+  with_first_found:
+    - "install-{{ ansible_facts['os_family'] }}.yml"
+  loop_control:
+    loop_var: _install_tasks_file
+
+- name: "Configure patroni"
+  ansible.builtin.include_tasks: "configure.yml"

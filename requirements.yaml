@@ -1,0 +1,5 @@
+collections:
+  # directory containing the collection
+  - source: ./community.postgres_cluster
+    type: dir
+  - name: community.postgresql

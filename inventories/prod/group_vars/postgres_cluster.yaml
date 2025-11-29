@@ -1,0 +1,16 @@
+---
+#Change patroni communication interface
+cluster_communication_interface: ens37
+#Change patroni communication network
+cluster_communication_network: 10.7.0.0/24
+
+# Define directory for OS
+# Debian
+postgres_config_dir: /etc/postgresql/17/main
+postgres_data_dir: /var/lib/postgresql/17/main
+postgres_bin_dir: /usr/lib/postgresql/17/bin
+
+# RedHat
+#postgres_config_dir: /var/lib/pgsql/data
+#postgres_data_dir: /var/lib/pgsql/data
+#postgres_bin_dir: /usr/bin

@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for patroni
+
+- name: Install pip package
+  ansible.builtin.package:
+    name:
+      - python3-pip
+    state: present
+
+- name: Make sure psycopg2 is installed - needed for ansible postgresql stuff
+  ansible.builtin.pip:
+    name:
+      - psycopg2-binary
+    state: present
+  become: true
+
+- name: Install patroni[etcd]
+  ansible.builtin.pip:
+    name: patroni[etcd]
+    state: present
+    executable: pip3
+    umask: '0022'
+  register: patroni_install
+
+- name: Start Patroni master node
+  when: is_master is defined and is_master == 'true'
+  block:
+    - name: Check postgres data dir
+      ansible.builtin.stat:
+        path: "{{ postgres_data_dir }}/PG_VERSION"
+      register: cluster_dir
+
+     # "RedHat" or Postgres
+    - name: Prepare PostgreSQL | create PostgreSQL on Master
+      become: true
+      become_user: postgres
+      ansible.builtin.command: "{{ postgres_bin_dir }}/pg_ctl init -D {{ postgres_data_dir }}"
+      register: pg_start_on_master
+      changed_when: not cluster_dir.stat.exists

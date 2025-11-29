@@ -1,0 +1,20 @@
+---
+- name: Install patroni cluster
+  hosts: postgres_cluster
+  become: yes
+  vars_files:
+    - ../secrets.yaml
+  vars:
+    patroni_repl_user: replicator
+    patroni_superuser: postgres
+  roles:
+    - role: community.postgres_cluster.etcd
+      tags:
+        - etcd-setup
+    - role: community.postgres_cluster.postgres
+      tags:
+        - postgres-setup
+    - role: community.postgres_cluster.patroni
+      tags:
+        - patroni-setup
+       
